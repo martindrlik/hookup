@@ -15,21 +15,6 @@ var consumerPool = NewConsumerPool(*consumerPoolLimit)
 
 func PullMessages(ctx context.Context, forUser string) ([]string, error) {
 
-	tryAcquireConsumer := func(ctx context.Context) (*kafka.Consumer, error) {
-		for n := 0; n <= 5; n++ {
-			c, err := consumerPool.Acquire(ctx)
-			if err == nil {
-				return c, nil
-			}
-			if err == ctx.Err() {
-				return nil, ctx.Err()
-			}
-			log.Printf("Failed to acquire consumer (attempt: %v): %v", n, err)
-			time.Sleep(time.Duration(math.Exp(float64(n))) * time.Second)
-		}
-		return nil, errors.New("all attempts to acquire consumer failed")
-	}
-
 	c, err := tryAcquireConsumer(ctx)
 	if err != nil {
 		return nil, err
@@ -83,5 +68,22 @@ func PullMessages(ctx context.Context, forUser string) ([]string, error) {
 			}
 		}
 	}
+
+}
+
+func tryAcquireConsumer(ctx context.Context) (*kafka.Consumer, error) {
+
+	for n := 0; n <= 5; n++ {
+		c, err := consumerPool.Acquire(ctx)
+		if err == nil {
+			return c, nil
+		}
+		if err == ctx.Err() {
+			return nil, ctx.Err()
+		}
+		log.Printf("Failed to acquire consumer (attempt: %v): %v", n, err)
+		time.Sleep(time.Duration(math.Exp(float64(n))) * time.Second)
+	}
+	return nil, errors.New("all attempts to acquire consumer failed")
 
 }

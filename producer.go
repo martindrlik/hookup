@@ -15,21 +15,6 @@ var producerPool = NewProducerPool(*producerPoolLimit)
 
 func PostMessage(ctx context.Context, message, from, to string) error {
 
-	tryAcquireProducer := func(ctx context.Context) (*kafka.Producer, error) {
-		for n := 0; n <= 5; n++ {
-			p, err := producerPool.Acquire(ctx)
-			if err == nil {
-				return p, nil
-			}
-			if err == ctx.Err() {
-				return nil, err
-			}
-			log.Printf("PostMessage failed to acquire producer (attempt: %v): %v", n, err)
-			time.Sleep(time.Duration(math.Exp(float64(n))) * time.Second)
-		}
-		return nil, errors.New("all attempts to acquire producer failed")
-	}
-
 	p, err := tryAcquireProducer(ctx)
 	if err != nil {
 		return err
@@ -56,5 +41,22 @@ func PostMessage(ctx context.Context, message, from, to string) error {
 	}
 
 	return nil
+
+}
+
+func tryAcquireProducer(ctx context.Context) (*kafka.Producer, error) {
+
+	for n := 0; n <= 5; n++ {
+		p, err := producerPool.Acquire(ctx)
+		if err == nil {
+			return p, nil
+		}
+		if err == ctx.Err() {
+			return nil, err
+		}
+		log.Printf("PostMessage failed to acquire producer (attempt: %v): %v", n, err)
+		time.Sleep(time.Duration(math.Exp(float64(n))) * time.Second)
+	}
+	return nil, errors.New("all attempts to acquire producer failed")
 
 }
