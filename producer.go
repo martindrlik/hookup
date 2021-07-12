@@ -1,4 +1,4 @@
-package main
+package hookup
 
 import (
 	"context"
@@ -11,15 +11,13 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-var producerPool = NewProducerPool(*producerPoolLimit)
+func (h *Hookup) PostMessage(ctx context.Context, message, from, to string) error {
 
-func PostMessage(ctx context.Context, message, from, to string) error {
-
-	p, err := tryAcquireProducer(ctx)
+	p, err := h.tryAcquireProducer(ctx)
 	if err != nil {
 		return err
 	}
-	defer producerPool.Release(p)
+	defer h.producerPool.Release(p)
 
 	delivery := make(chan kafka.Event)
 
@@ -44,10 +42,10 @@ func PostMessage(ctx context.Context, message, from, to string) error {
 
 }
 
-func tryAcquireProducer(ctx context.Context) (*kafka.Producer, error) {
+func (h *Hookup) tryAcquireProducer(ctx context.Context) (*kafka.Producer, error) {
 
 	for n := 0; n <= 5; n++ {
-		p, err := producerPool.Acquire(ctx)
+		p, err := h.producerPool.Acquire(ctx)
 		if err == nil {
 			return p, nil
 		}

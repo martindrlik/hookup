@@ -1,4 +1,4 @@
-package main
+package hookup
 
 import (
 	"context"
@@ -7,14 +7,15 @@ import (
 )
 
 type ConsumerPool struct {
-	sem  chan struct{}
-	idle chan *kafka.Consumer
+	broker string
+	sem    chan struct{}
+	idle   chan *kafka.Consumer
 }
 
-func NewConsumerPool(limit int) *ConsumerPool {
+func newConsumerPool(broker string, limit int) *ConsumerPool {
 	sem := make(chan struct{}, limit)
 	idle := make(chan *kafka.Consumer, limit)
-	return &ConsumerPool{sem, idle}
+	return &ConsumerPool{broker, sem, idle}
 }
 
 func (cp *ConsumerPool) Release(c *kafka.Consumer) {
@@ -28,7 +29,7 @@ func (cp *ConsumerPool) Acquire(ctx context.Context) (*kafka.Consumer, error) {
 		return c, nil
 	case cp.sem <- struct{}{}:
 		c, err := kafka.NewConsumer(&kafka.ConfigMap{
-			"bootstrap.servers":     *broker,
+			"bootstrap.servers":     cp.broker,
 			"broker.address.family": "v4",
 			"session.timeout.ms":    6000,
 			"group.id":              "default",

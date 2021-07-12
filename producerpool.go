@@ -1,4 +1,4 @@
-package main
+package hookup
 
 import (
 	"context"
@@ -6,30 +6,31 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-type ProducerPool struct {
-	sem  chan struct{}
-	idle chan *kafka.Producer
+type producerPool struct {
+	broker string
+	sem    chan struct{}
+	idle   chan *kafka.Producer
 }
 
-func NewProducerPool(limit int) *ProducerPool {
+func newProducerPool(broker string, limit int) *producerPool {
 
 	sem := make(chan struct{}, limit)
 	idle := make(chan *kafka.Producer, limit)
-	return &ProducerPool{sem, idle}
+	return &producerPool{broker, sem, idle}
 
 }
 
-func (pp *ProducerPool) Release(p *kafka.Producer) {
+func (pp *producerPool) Release(p *kafka.Producer) {
 	pp.idle <- p
 }
 
-func (pp *ProducerPool) Acquire(ctx context.Context) (*kafka.Producer, error) {
+func (pp *producerPool) Acquire(ctx context.Context) (*kafka.Producer, error) {
 
 	select {
 	case p := <-pp.idle:
 		return p, nil
 	case pp.sem <- struct{}{}:
-		p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": *broker})
+		p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": pp.broker})
 		if err != nil {
 			<-pp.sem
 		}

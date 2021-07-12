@@ -1,4 +1,4 @@
-package main
+package hookup
 
 import (
 	"context"
@@ -11,15 +11,13 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-var consumerPool = NewConsumerPool(*consumerPoolLimit)
+func (h *Hookup) PullMessages(ctx context.Context, forUser string) ([]string, error) {
 
-func PullMessages(ctx context.Context, forUser string) ([]string, error) {
-
-	c, err := tryAcquireConsumer(ctx)
+	c, err := h.tryAcquireConsumer(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer consumerPool.Release(c)
+	defer h.consumerPool.Release(c)
 
 	topic := topicFromUsername(forUser)
 
@@ -37,7 +35,7 @@ func PullMessages(ctx context.Context, forUser string) ([]string, error) {
 		}
 	}
 
-	messages := make([]string, 0, *messageLimit)
+	messages := make([]string, 0, h.options.pullLimit)
 	var cancel context.CancelFunc
 
 	for {
@@ -59,8 +57,8 @@ func PullMessages(ctx context.Context, forUser string) ([]string, error) {
 				}
 
 				if len(messages) == 1 {
-					log.Printf("Waiting (%v) for other messages", *messageReturnLinger)
-					ctx, cancel = context.WithTimeout(ctx, *messageReturnLinger)
+					log.Printf("Waiting (%v) for other messages", h.options.pullLinger)
+					ctx, cancel = context.WithTimeout(ctx, h.options.pullLinger)
 					defer cancel()
 				}
 			default:
@@ -71,10 +69,10 @@ func PullMessages(ctx context.Context, forUser string) ([]string, error) {
 
 }
 
-func tryAcquireConsumer(ctx context.Context) (*kafka.Consumer, error) {
+func (h *Hookup) tryAcquireConsumer(ctx context.Context) (*kafka.Consumer, error) {
 
 	for n := 0; n <= 5; n++ {
-		c, err := consumerPool.Acquire(ctx)
+		c, err := h.consumerPool.Acquire(ctx)
 		if err == nil {
 			return c, nil
 		}

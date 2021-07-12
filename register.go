@@ -1,4 +1,4 @@
-package main
+package hookup
 
 import (
 	"context"
@@ -20,14 +20,17 @@ func (err registerUsersError) Error() string {
 	return "unable to register some or all users"
 }
 
-func RegisterUser(name string) error {
+func (h *Hookup) RegisterUsers(names []string) error {
 
-	topics := []kafka.TopicSpecification{
-		{Topic: topicFromUsername(name),
+	topics := make([]kafka.TopicSpecification, 0, len(names))
+	for _, name := range names {
+		topics = append(topics, kafka.TopicSpecification{
+			Topic:             topicFromUsername(name),
 			NumPartitions:     2,
-			ReplicationFactor: 1}}
+			ReplicationFactor: 1})
+	}
 
-	a, err := kafka.NewAdminClient(&kafka.ConfigMap{"bootstrap.servers": *broker})
+	a, err := kafka.NewAdminClient(&kafka.ConfigMap{"bootstrap.servers": h.options.broker})
 	if err != nil {
 		return err
 	}
